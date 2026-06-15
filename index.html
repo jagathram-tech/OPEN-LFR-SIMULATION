@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LFR Challenge — 3-Level Robot Game</title>
+<style>
+  :root {
+    --bg:#0c1118; --panel:#171f2c; --panel2:#222c3e; --border:#2c3850;
+    --text:#e0e6ef; --muted:#8a97a8;
+    --accent:#46d1a3; --accent2:#f5a623; --danger:#e0556b; --gold:#ffd24a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin:0; height:100%; background: var(--bg); color: var(--text);
+    font-family:'Segoe UI', system-ui, sans-serif; overflow:hidden;
+    /* fluid root font so every rem scales with viewport */
+    font-size: clamp(11px, 0.85vw, 15px);
+  }
+  button { font-family: inherit; }
+
+  /* ---------- screens ---------- */
+  .screen {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    padding: 1.8vh 1.5vw; overflow:auto;
+  }
+  .screen.hidden { display:none; }
+
+  /* ===== LEVEL SELECT ===== */
+  #select-screen { flex-direction: column; padding: 4vh 2vw; }
+  #select-screen h1 {
+    font-size: clamp(1.6rem, 3vw, 2.6rem);
+    margin: 0 0 0.4rem;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  #select-screen .tag {
+    color: var(--muted); margin-bottom: 1.8rem; font-size: 0.95rem;
+  }
+  .level-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1.2vw; width: 90vw; max-width: 1300px;
+  }
+  .level-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 0.7rem; padding: 1.1rem; cursor: pointer;
+    transition: transform .15s, border-color .15s, box-shadow .15s;
+    display: flex; flex-direction: column;
+  }
+  .level-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: 0 0.4rem 1.4rem rgba(70,209,163,.15);
+  }
+  .level-card .badge {
+    display: inline-block; padding: 0.2rem 0.7rem; border-radius: 99px;
+    font-size: 0.7rem; letter-spacing: .06em; text-transform: uppercase;
+    margin-bottom: 0.6rem; font-weight: 600;
+  }
+  .level-card.l1 .badge { background:#1e3b2d; color: var(--accent); }
+  .level-card.l2 .badge { background:#3b2f17; color: var(--accent2); }
+  .level-card.l3 .badge { background:#3b1f2a; color: var(--danger); }
+  .level-card h2 { margin: 0 0 0.25rem; font-size: 1.2rem; }
+  .level-card p {
+    margin: 0 0 0.6rem; color: var(--muted);
+    font-size: 0.82rem; min-height: 2.4rem;
+  }
+  .mini { width: 100%; background: #fff; border-radius: 0.35rem; aspect-ratio: 4/3; }
+  .level-card .meta {
+    display: flex; justify-content: space-between;
+    font-size: 0.78rem; color: var(--muted); margin-top: 0.6rem;
+  }
+  .level-card .best { color: var(--gold); font-weight: 600; }
+
+  /* ===== CONFIG / PREVIEW ===== */
+  #config-screen { padding-top: 6vh; align-items: stretch; }
+  #config-screen .config-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 1.4vw;
+    width: 96vw;
+    max-width: 1500px;
+    height: calc(100vh - 7vh);
+  }
+  .panel-box {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 1.1rem 1.2rem;
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .panel-box h2 {
+    margin: 0 0 0.9rem;
+    font-size: 0.95rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent2);
+  }
+  .section-divider {
+    grid-column: 1 / -1;
+    margin: 0.8rem 0 0.6rem;
+    font-size: 0.78rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--accent2);
+    border-top: 1px solid var(--border);
+    padding-top: 0.7rem;
+  }
+  .fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1rem;
+    row-gap: 0.5rem;
+  }
+  .field { margin-bottom: 0.3rem; min-width: 0; }
+  .field.full { grid-column: 1 / -1; }
+  .field label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.78rem; color: var(--muted); margin-bottom: 0.25rem;
+  }
+  .field label .v { color: var(--text); font-variant-numeric: tabular-nums; }
+  .field input[type=number] {
+    width: 100%; background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 0.3rem;
+    padding: 0.35rem 0.55rem; font-size: 0.85rem;
+  }
+  .field input[type=range] {
+    width: 100%; accent-color: var(--accent);
+    margin: 0.1rem 0; height: 1.1rem;
+  }
+  .field .hint {
+    font-size: 0.68rem; color: var(--muted); margin-top: 0.18rem; line-height: 1.3;
+  }
+
+  .preview-box {
+    display: flex; flex-direction: column; gap: 0.7rem; min-height: 0;
+  }
+  .preview-box .row {
+    display: flex; align-items: flex-start; flex: 0 1 auto; min-height: 0;
+  }
+  #previewCanvas {
+    background: #fff; border-radius: 0.4rem;
+    width: 100%; height: auto; aspect-ratio: 4 / 3;
+    max-height: 56vh;
+    object-fit: contain;
+  }
+  .tips {
+    background: var(--panel2); border-radius: 0.4rem;
+    padding: 0.7rem 0.9rem; font-size: 0.82rem;
+    flex: 0 0 auto;
+  }
+  .tips h3 {
+    margin: 0 0 0.4rem;
+    font-size: 0.75rem; color: var(--accent);
+    text-transform: uppercase; letter-spacing: .07em;
+  }
+  .tips ul { margin: 0; padding-left: 1.1rem; color: var(--text); }
+  .tips li { margin: 0.15rem 0; }
+
+  .actions {
+    display: flex; gap: 0.55rem;
+    margin-top: 0.9rem;
+    position: sticky; bottom: 0;
+    background: var(--panel);
+    padding-top: 0.5rem;
+  }
+  button.primary {
+    background: var(--accent); color: #0a1f17; border: none;
+    padding: 0.6rem 1.1rem; border-radius: 0.35rem;
+    font-weight: 600; cursor: pointer; font-size: 0.9rem;
+  }
+  button.ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.5rem 1rem; border-radius: 0.35rem;
+    cursor: pointer; font-size: 0.85rem;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.ghost:hover { border-color: var(--accent); }
+
+  /* ===== PLAY SCREEN ===== */
+  #play-screen { padding: 0; align-items: stretch; }
+  #play-screen .play-wrap {
+    display: flex; width: 100%; height: 100%;
+  }
+  #playStage {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: #0e1620; position: relative;
+    padding: 1.5vh 1vw;
+    min-width: 0;
+  }
+  #gameCanvas {
+    background: #fff; border-radius: 0.4rem;
+    box-shadow: 0 0 2rem rgba(0,0,0,.5);
+    width: auto; height: auto;
+    max-width: 100%; max-height: 100%;
+    aspect-ratio: 4 / 3;
+  }
+  #hud {
+    position: absolute; top: 1.4vh; left: 1vw; right: 1vw;
+    display: flex; justify-content: space-between; pointer-events: none;
+  }
+  #hud .pill, #hud .level-pill {
+    background: rgba(10,15,22,.85); border: 1px solid var(--border);
+    border-radius: 99px; padding: 0.35rem 0.85rem; font-size: 0.82rem;
+    pointer-events: auto;
+  }
+  #hud .level-pill { font-weight: 600; }
+  #hud .stats { display: flex; gap: 0.55rem; }
+  #hud .stat { color: var(--muted); }
+  #hud .stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+  #timeBar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 0.35rem; background: rgba(255,255,255,.06);
+  }
+  #timeFill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 100%; transition: width .1s linear, background .3s;
+  }
+  #timeFill.warning { background: var(--accent2) !important; }
+  #timeFill.danger  { background: var(--danger)  !important; }
+
+  #playSidebar {
+    width: clamp(240px, 22vw, 320px);
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    padding: 0.9rem; display: flex; flex-direction: column;
+    gap: 0.7rem; overflow-y: auto;
+  }
+  .side-box {
+    background: var(--panel2);
+    border-radius: 0.4rem;
+    padding: 0.6rem 0.75rem;
+  }
+  .side-box h3 {
+    margin: 0 0 0.5rem; font-size: 0.7rem;
+    text-transform: uppercase; letter-spacing: .07em;
+    color: var(--accent);
+  }
+  .ks {
+    display: flex; justify-content: space-between;
+    font-size: 0.78rem; margin: 0.18rem 0;
+  }
+  .ks span:last-child { color: var(--accent2); font-variant-numeric: tabular-nums; }
+  #sensorBars {
+    display: flex; gap: 0.18rem; height: 2.4rem;
+    align-items: flex-end; margin-top: 0.4rem;
+  }
+  .sbar {
+    flex: 1; background: #39506b;
+    border-radius: 0.15rem 0.15rem 0 0;
+    transition: height .05s, background .05s;
+  }
+
+  /* ===== RESULT MODAL ===== */
+  #result-screen { background: rgba(8,12,18,.85); backdrop-filter: blur(6px); }
+  .result-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    padding: 1.8rem 2.1rem;
+    width: clamp(320px, 32vw, 480px);
+    max-width: 92vw; text-align: center;
+  }
+  .result-card .verdict {
+    font-size: clamp(1.4rem, 2.2vw, 2rem);
+    font-weight: 700; margin-bottom: 0.85rem;
+  }
+  .verdict.win  { color: var(--accent); }
+  .verdict.lose { color: var(--danger); }
+  .stars {
+    font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+    letter-spacing: 0.4rem; margin-bottom: 0.85rem; color: #3a4760;
+  }
+  .stars .on { color: var(--gold); text-shadow: 0 0 0.7rem rgba(255,210,74,.5); }
+  .score-big {
+    font-size: clamp(2.4rem, 4.2vw, 3.6rem);
+    font-weight: 700; line-height: 1;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 0.25rem;
+  }
+  .score-tag {
+    color: var(--muted); font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: .1em;
+    margin-bottom: 1.1rem;
+  }
+  .result-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem; margin-bottom: 1.3rem;
+  }
+  .rs-cell { background: var(--panel2); border-radius: 0.4rem; padding: 0.6rem; }
+  .rs-cell .l {
+    font-size: 0.65rem; text-transform: uppercase;
+    color: var(--muted); letter-spacing: .07em;
+  }
+  .rs-cell .v { font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem; }
+  .new-best {
+    display: inline-block; background: var(--gold); color: #3a2900;
+    padding: 0.18rem 0.7rem; border-radius: 99px;
+    font-size: 0.7rem; font-weight: 700;
+    margin-bottom: 0.7rem; letter-spacing: .06em; text-transform: uppercase;
+  }
+
+  /* shared header bar on non-select screens */
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 0.65rem 1rem;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.75rem;
+    z-index: 5;
+  }
+  .topbar .title { font-weight: 600; font-size: 0.95rem; }
+  .topbar .spacer { flex: 1; }
+
+  /* ============ BEGINNER-FRIENDLY ADDITIONS ============ */
+
+  /* intro banner + 3 steps */
+  .intro-banner {
+    background: linear-gradient(90deg, rgba(70,209,163,.12), rgba(245,166,35,.10));
+    border: 1px solid var(--border); border-radius: 0.6rem;
+    padding: 0.85rem 1rem; margin-bottom: 1rem;
+    font-size: 0.86rem; line-height: 1.5;
+  }
+  .intro-banner b { color: var(--accent); }
+  .intro-steps { display: flex; gap: 0.55rem; margin-top: 0.7rem; flex-wrap: wrap; }
+  .intro-steps .step {
+    flex: 1; min-width: 150px; background: var(--panel2);
+    border-radius: 0.4rem; padding: 0.55rem 0.7rem; font-size: 0.78rem; line-height: 1.35;
+  }
+  .intro-steps .n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.35rem; height: 1.35rem; border-radius: 99px;
+    background: var(--accent); color: #0a1f17; font-weight: 700;
+    font-size: 0.72rem; margin-right: 0.4rem;
+  }
+
+  /* "use recommended settings" button */
+  .recommend-btn {
+    width: 100%; background: var(--panel2); color: var(--accent);
+    border: 1px dashed var(--accent); border-radius: 0.45rem;
+    padding: 0.65rem; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+    margin-bottom: 1rem; transition: background .15s;
+  }
+  .recommend-btn:hover { background: rgba(70,209,163,.12); }
+  .recommend-btn.flash { animation: flashOk .6s ease; }
+  @keyframes flashOk { 0%{background:var(--accent);color:#0a1f17;} 100%{background:var(--panel2);} }
+
+  /* prominent simple controls */
+  .simple-label { font-size: 0.95rem; color: var(--text); font-weight: 600; }
+  .control-desc {
+    font-size: 0.74rem; color: var(--muted);
+    margin: 0.05rem 0 0.3rem; line-height: 1.35;
+  }
+
+  /* collapsible advanced section */
+  details.advanced {
+    border: 1px solid var(--border); border-radius: 0.5rem;
+    margin-top: 0.9rem; background: rgba(0,0,0,.14);
+  }
+  details.advanced > summary {
+    cursor: pointer; padding: 0.75rem 0.9rem; font-size: 0.82rem;
+    color: var(--text); user-select: none; list-style: none;
+    display: flex; align-items: center; gap: 0.45rem;
+  }
+  details.advanced > summary::-webkit-details-marker { display: none; }
+  details.advanced > summary::before {
+    content: '▸'; color: var(--accent2); transition: transform .15s; display: inline-block;
+  }
+  details.advanced[open] > summary::before { transform: rotate(90deg); }
+  details.advanced[open] > summary { border-bottom: 1px solid var(--border); }
+  details.advanced .adv-body { padding: 0.9rem; }
+  details.advanced .adv-body .section-divider:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+
+  /* Simple / Detailed segmented toggle (play sidebar) */
+  .seg-toggle {
+    display: flex; background: var(--panel2); border-radius: 99px;
+    padding: 0.2rem; gap: 0.2rem;
+  }
+  .seg-toggle button {
+    flex: 1; background: transparent; color: var(--muted); border: none;
+    padding: 0.4rem; border-radius: 99px; cursor: pointer;
+    font-size: 0.78rem; font-weight: 600;
+  }
+  .seg-toggle button.active { background: var(--accent); color: #0a1f17; }
+  #techBoxes { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  /* "how to play" on the level-select screen */
+  details.howto {
+    margin-top: 1.4rem; max-width: 680px; width: 90vw;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 0.6rem;
+  }
+  details.howto > summary {
+    cursor: pointer; padding: 0.7rem 1rem; color: var(--accent);
+    font-size: 0.9rem; font-weight: 600; list-style: none;
+  }
+  details.howto > summary::-webkit-details-marker { display: none; }
+  details.howto .howto-body {
+    padding: 0 1rem 1rem; font-size: 0.86rem; line-height: 1.6; color: var(--text);
+  }
+  details.howto .howto-body b { color: var(--accent2); }
+
+  /* result-screen beginner tip */
+  .result-tip {
+    background: var(--panel2); border-radius: 0.4rem;
+    padding: 0.65rem 0.85rem; font-size: 0.82rem; color: var(--text);
+    line-height: 1.45; margin-bottom: 1.1rem; text-align: left;
+  }
+  .result-tip:empty { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ============ LEVEL SELECT SCREEN ============ -->
+<div class="screen" id="select-screen">
+  <h1>LFR Challenge</h1>
+  <div class="tag">Tune a line-following robot and guide it around the track. New? Start with Level 1.</div>
+  <div class="level-grid" id="levelGrid"><!-- filled by JS --></div>
+
+  <details class="howto">
+    <summary>❓ What is this / How do I play?</summary>
+    <div class="howto-body">
+      A <b>line-following robot</b> drives itself by reading a black line with little light sensors.
+      You don't steer it — you <b>set it up</b>, then watch it run.
+      <ul style="margin:0.5rem 0 0; padding-left:1.2rem;">
+        <li>Pick a level → press <b>Use recommended settings</b> → press <b>Start</b>.</li>
+        <li>Too wobbly? Lower <b>Speed</b>. Keeps falling off corners? Raise <b>Steering strength</b>.</li>
+        <li>Reach the red <b>F</b> (finish) before time runs out to clear the track.</li>
+        <li>Fewer line-losses + faster finish = more <b>stars</b> and a higher score.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div style="margin-top:18px; display:flex; gap:10px;">
+    <button class="ghost" id="resetLeaderboard">Reset leaderboard</button>
+  </div>
+</div>
+
+<!-- ============ CONFIG / PREVIEW SCREEN ============ -->
+<div class="screen hidden" id="config-screen">
+  <div class="topbar">
+    <button class="ghost" id="backToSelect">&larr; Levels</button>
+    <div class="title" id="cfgTitle">Level —</div>
+    <div class="spacer"></div>
+  </div>
+  <div class="config-wrap" style="margin-top:50px;">
+    <div class="panel-box">
+      <div class="intro-banner">
+        <b>New here?</b> A line-following robot stays on the black line using light sensors.
+        You set it up, then it drives itself. Just do these three things:
+        <div class="intro-steps">
+          <div class="step"><span class="n">1</span>Click <b>Use recommended settings</b> below</div>
+          <div class="step"><span class="n">2</span>Press <b>Start Level</b> and watch it go</div>
+          <div class="step"><span class="n">3</span>Adjust <b>Speed</b> &amp; <b>Steering</b> to beat your score</div>
+        </div>
+      </div>
+
+      <button class="recommend-btn" id="recommendBtn">✨ Use recommended settings for this level</button>
+
+      <h2>The basics</h2>
+      <div class="field full">
+        <label class="simple-label">Motor speed <span class="v" id="vs_speed">160</span></label>
+        <div class="control-desc">How fast the robot drives. Faster = harder to keep on the line.</div>
+        <input type="range" id="cs_speed" min="40" max="255" value="160">
+      </div>
+      <div class="field full">
+        <label class="simple-label">Steering strength (Kp) <span class="v" id="vs_kp">1.20</span></label>
+        <div class="control-desc">How hard it turns back toward the line. Too low → drifts off; too high → wobbles.</div>
+        <input type="range" id="cs_kp" min="0" max="300" value="120">
+      </div>
+      <div class="fields-grid">
+        <div class="field">
+          <label class="simple-label">Light sensors <span class="v" id="vs_sensors">4</span></label>
+          <div class="control-desc">More = smoother on curves.</div>
+          <input type="number" id="cs_sensors" min="2" max="16" value="4">
+        </div>
+        <div class="field">
+          <label class="simple-label">Sensor sensitivity <span class="v" id="vs_sensitivity">60%</span></label>
+          <div class="control-desc">How dark counts as "the line".</div>
+          <input type="range" id="cs_sensitivity" min="0" max="100" value="60">
+        </div>
+      </div>
+
+      <details class="advanced">
+        <summary>Advanced — robot build &amp; physics (optional, for tinkerers)</summary>
+        <div class="adv-body">
+          <div class="section-divider">Robot build</div>
+          <div class="fields-grid">
+            <div class="field">
+              <label>Wheel Diameter (mm)</label>
+              <input type="number" id="cs_wheelDia" min="10" max="200" value="65">
+            </div>
+            <div class="field">
+              <label>Motor RPM (max)</label>
+              <input type="number" id="cs_rpm" min="30" max="1000" value="200">
+              <div class="hint" id="rpmHint">Top wheel speed at 100% PWM</div>
+            </div>
+            <div class="field">
+              <label>Motor Diameter (mm)</label>
+              <input type="number" id="cs_motorDia" min="6" max="80" value="25">
+              <div class="hint">Diameter of the motor body</div>
+            </div>
+            <div class="field">
+              <label>Track Width (mm)</label>
+              <input type="number" id="cs_axle" min="20" max="400" value="100">
+              <div class="hint">Distance between the two wheels</div>
+            </div>
+            <div class="field">
+              <label>Wheel Width (mm)</label>
+              <input type="number" id="cs_wheelW" min="5" max="100" value="20">
+            </div>
+            <div class="field">
+              <label>Chassis Length (mm)</label>
+              <input type="number" id="cs_chassisL" min="40" max="500" value="150">
+            </div>
+            <div class="field">
+              <label>Chassis Width (mm)</label>
+              <input type="number" id="cs_chassisW" min="30" max="400" value="100">
+            </div>
+            <div class="field">
+              <label>Mass (g)</label>
+              <input type="number" id="cs_mass" min="20" max="5000" value="200">
+              <div class="hint">Inertia &amp; traction reference</div>
+            </div>
+          </div>
+
+          <div class="section-divider">Physics &amp; Dynamics</div>
+          <div class="fields-grid">
+            <div class="field">
+              <label>Surface friction μ <span class="v" id="vs_friction">0.80</span></label>
+              <input type="range" id="cs_friction" min="10" max="200" value="80">
+              <div class="hint">Lower = more slip</div>
+            </div>
+            <div class="field">
+              <label>Motor τ (ms) <span class="v" id="vs_tau">80</span></label>
+              <input type="range" id="cs_tau" min="0" max="400" value="80">
+              <div class="hint">Step-response time constant</div>
+            </div>
+            <div class="field">
+              <label>Max wheel accel <span class="v" id="vs_accel">4000</span></label>
+              <input type="range" id="cs_accel" min="500" max="15000" step="100" value="4000">
+              <div class="hint">mm/s² — torque-limited</div>
+            </div>
+            <div class="field">
+              <label>Sensor noise σ <span class="v" id="vs_noise">8</span></label>
+              <input type="range" id="cs_noise" min="0" max="40" value="8">
+              <div class="hint">Gaussian noise on reads</div>
+            </div>
+            <div class="field">
+              <label>Control loop (Hz) <span class="v" id="vs_hz">100</span></label>
+              <input type="range" id="cs_hz" min="10" max="500" value="100">
+              <div class="hint">Sensor + motor update rate</div>
+            </div>
+            <div class="field full">
+              <label><input type="checkbox" id="cs_ambient" style="width:auto;accent-color:var(--accent);margin-right:0.4rem;">Ambient light interference</label>
+              <div class="hint">Time-varying brightness offset on sensors</div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button class="primary" id="startLevelBtn">Start Level →</button>
+      </div>
+    </div>
+
+    <div class="panel-box preview-box">
+      <h2>Track Preview & Tips</h2>
+      <div class="row">
+        <canvas id="previewCanvas" width="800" height="600"></canvas>
+      </div>
+      <div class="tips" id="tipsBox" style="margin-top:14px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLAY SCREEN ============ -->
+<div class="screen hidden" id="play-screen">
+  <div class="play-wrap">
+    <div id="playStage">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+      <div id="hud">
+        <div class="level-pill" id="hudLevel">Level 1</div>
+        <div class="stats">
+          <div class="pill stat">Time <b id="hudTime">30.0</b>s</div>
+          <div class="pill stat">Losses <b id="hudLoss">0</b></div>
+          <div class="pill stat">Progress <b id="hudProg">0</b>%</div>
+        </div>
+      </div>
+      <div id="timeBar"><div id="timeFill"></div></div>
+    </div>
+    <div id="playSidebar">
+      <div class="seg-toggle" id="viewToggle">
+        <button data-view="simple" class="active">Simple</button>
+        <button data-view="detailed">Detailed</button>
+      </div>
+      <div class="side-box">
+        <h3>Tips for this track</h3>
+        <div id="liveHint" style="font-size:12px;color:var(--text);line-height:1.5"></div>
+      </div>
+      <div id="techBoxes" style="display:none;">
+        <div class="side-box">
+          <h3>Live Debug</h3>
+          <div class="ks"><span>Status</span><span id="d_state">Running</span></div>
+          <div class="ks"><span>Line error</span><span id="d_err">0.00</span></div>
+          <div class="ks"><span>On line</span><span id="d_on">yes</span></div>
+          <div class="ks"><span>Heading</span><span id="d_head">0°</span></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;">Sensor array (L→R)</div>
+          <div id="sensorBars"></div>
+          <div class="ks" style="margin-top:8px;"><span>Cmd PWM L→R</span><span id="d_ml">0 / 0</span></div>
+          <div class="ks"><span>Actual L→R (mm/s)</span><span id="d_mr">0 / 0</span></div>
+        </div>
+        <div class="side-box">
+          <h3>Physics</h3>
+          <div class="ks"><span>Velocity</span><span id="d_v">0 mm/s</span></div>
+          <div class="ks"><span>Angular vel</span><span id="d_w">0 rad/s</span></div>
+          <div class="ks"><span>Lat accel</span><span id="d_alat">0 mm/s²</span></div>
+          <div class="ks"><span>Traction limit</span><span id="d_amax">0 mm/s²</span></div>
+          <div class="ks"><span>Slip</span><span id="d_slip" style="color:var(--accent)">no</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="abandonBtn" style="flex:1;">Quit</button>
+        <button class="primary" id="restartBtn" style="flex:1;">Restart</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RESULT SCREEN ============ -->
+<div class="screen hidden" id="result-screen">
+  <div class="result-card">
+    <div id="newBestTag" class="new-best" style="display:none;">New best!</div>
+    <div class="verdict" id="verdictTxt">Success</div>
+    <div class="stars" id="starsTxt">★★★</div>
+    <div class="score-big" id="scoreBig">0</div>
+    <div class="score-tag">Final score</div>
+    <div class="result-stats">
+      <div class="rs-cell"><div class="l">Time</div><div class="v" id="rsTime">—</div></div>
+      <div class="rs-cell"><div class="l">Line losses</div><div class="v" id="rsLoss">—</div></div>
+      <div class="rs-cell"><div class="l">Progress</div><div class="v" id="rsProg">—</div></div>
+    </div>
+    <div class="result-tip" id="resultTip"></div>
+    <div class="actions" style="justify-content:center;">
+      <button class="ghost" id="rBack">Levels</button>
+      <button class="ghost" id="rRetry">Retry</button>
+      <button class="primary" id="rNext">Next →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   LFR CHALLENGE GAME
+   ------------------------------------------------------------------------
+   Three predefined levels played on an 800×600 canvas.
+   Track is rasterised onto an offscreen canvas, the robot's sensors
+   sample brightness at world positions, and a P-controller drives the
+   differential-drive kinematics.
+
+   Progress is tracked by computing the parameter (0..1) on the track's
+   polyline closest to the robot at each frame, with monotonic clamping
+   so the robot must visit waypoints in order. Reaching p>=0.98 wins.
+   ========================================================================= */
+
+const CANVAS_W = 800, CANVAS_H = 600;
+const PX_PER_MM = 0.42;                  // 800px ≈ 1900mm field
+
+// =========================================================================
+// LEVEL DEFINITIONS
+// =========================================================================
+const LEVELS = [
+  {
+    id: 1, name: 'Level 1 — Beginner',
+    color: '#46d1a3',
+    desc: 'A clean horizontal line. Get familiar with the controls.',
+    lineWidth: 30, timeLimit: 30,
+    tips: [
+      'Defaults work fine — just press Start.',
+      'Higher Motor Speed = faster, but harder to correct.',
+      'A small Kp (0.5–1.0) is plenty for a straight line.'
+    ],
+    // path returns an array of {x,y} polyline points
+    path: () => {
+      const pts = [];
+      for (let x=80; x<=720; x+=10) pts.push({x, y:300});
+      return pts;
+    },
+    start: { x: 80, y: 300, theta: 0 }
+  },
+  {
+    id: 2, name: 'Level 2 — Intermediate',
+    color: '#f5a623',
+    desc: 'A smooth figure-8. Sharp enough to need responsive sensors.',
+    lineWidth: 25, timeLimit: 45,
+    tips: [
+      'Use 4+ sensors for smoother curves.',
+      'Crank Kp up to ~1.5–2.0 to handle the crossover.',
+      'A lower Motor Speed (120–160) gives you time to correct.'
+    ],
+    path: () => {
+      // lemniscate of Bernoulli — proper figure 8
+      const cx=400, cy=300, a=200;
+      const pts = [];
+      for (let t=0; t<=Math.PI*2 + 0.05; t+=0.03){
+        const denom = 1 + Math.cos(t)*Math.cos(t);
+        pts.push({
+          x: cx + a * Math.cos(t) / denom,
+          y: cy + a * Math.cos(t)*Math.sin(t) / denom
+        });
+      }
+      return pts;
+    },
+    start: null // computed: first path point, heading toward second
+  },
+  {
+    id: 3, name: 'Level 3 — Advanced',
+    color: '#e0556b',
+    desc: 'Sharp 90° corners, S-curves, a loop, and a narrow gauntlet.',
+    lineWidth: 20, timeLimit: 60,
+    tips: [
+      'Drop Motor Speed to ~110–130 — the loop will throw you off.',
+      'Use 6–8 sensors for sharper line tracking.',
+      'Kp around 1.8–2.5 helps grip the 90° corners.',
+      'If you lose the line, you keep turning toward where you last saw it.'
+    ],
+    path: () => {
+      // Hand-built waypoint sequence with rounded corners
+      const wp = [
+        {x:60,  y:80},   {x:230, y:80},   // top straight
+        {x:280, y:130},  {x:280, y:230},  // 90° down
+        {x:330, y:280},  {x:430, y:280},  // S into middle
+        {x:480, y:230},  {x:480, y:130},  // S up
+        {x:530, y:80},   {x:720, y:80},   // top right
+        {x:740, y:100},  {x:740, y:200},  // down right edge
+        // loop-the-loop (small circle)
+        ...arc(660, 260, 60, -Math.PI/2, Math.PI*1.5, 28),
+        {x:740, y:260},  {x:740, y:380},  // continue down
+        {x:720, y:400},  {x:520, y:400},  // narrow corridor (we render guard rails close)
+        {x:500, y:420},  {x:500, y:500},  // down
+        {x:480, y:520},  {x:80,  y:520},  // bottom straight
+        {x:60,  y:500},  {x:60,  y:380},  // up the left
+        {x:80,  y:360},  {x:200, y:360},  // jut right
+        {x:220, y:340},  {x:220, y:260},  // up
+        {x:200, y:240},  {x:120, y:240},  // jut left
+        {x:100, y:220},  {x:100, y:160}   // finish near top-left
+      ];
+      // smooth between waypoints with linear interpolation (dense polyline)
+      const out = [];
+      for (let i=0; i<wp.length-1; i++){
+        const a=wp[i], b=wp[i+1];
+        const d = Math.hypot(b.x-a.x, b.y-a.y);
+        const steps = Math.max(2, Math.round(d/6));
+        for (let s=0; s<steps; s++){
+          const t=s/steps;
+          out.push({ x: a.x+(b.x-a.x)*t, y: a.y+(b.y-a.y)*t });
+        }
+      }
+      out.push(wp[wp.length-1]);
+      return out;
+    },
+    start: null
+  }
+];
+function arc(cx, cy, r, a0, a1, steps) {
+  const out = []; const da = (a1-a0)/steps;
+  for (let i=0;i<=steps;i++){
+    const a = a0 + da*i;
+    out.push({ x: cx + r*Math.cos(a), y: cy + r*Math.sin(a) });
+  }
+  return out;
+}
+
+// fill in computed starts
+LEVELS.forEach(L => {
+  if (!L.start) {
+    const p = L.path();
+    const a = p[0], b = p[1] || p[0];
+    L.start = { x: a.x, y: a.y, theta: Math.atan2(b.y-a.y, b.x-a.x) };
+  }
+});
+
+// =========================================================================
+// LEADERBOARD (localStorage)
+// =========================================================================
+const LB_KEY = 'lfr_challenge_lb_v1';
+function loadLB() {
+  try { return JSON.parse(localStorage.getItem(LB_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveLB(lb) { localStorage.setItem(LB_KEY, JSON.stringify(lb)); }
+function getBest(levelId) { return loadLB()[levelId] || null; }
+function setBest(levelId, entry) {
+  const lb = loadLB();
+  const cur = lb[levelId];
+  if (!cur || entry.score > cur.score) { lb[levelId] = entry; saveLB(lb); return true; }
+  return false;
+}
+
+// =========================================================================
+// LEVEL SELECT — render cards with mini track previews
+// =========================================================================
+const grid = document.getElementById('levelGrid');
+function renderLevelSelect() {
+  grid.innerHTML = '';
+  LEVELS.forEach(L => {
+    const best = getBest(L.id);
+    const card = document.createElement('div');
+    card.className = `level-card l${L.id}`;
+    card.innerHTML = `
+      <span class="badge" style="color:${L.color}; background:${L.color}22;">Level ${L.id}</span>
+      <h2>${L.name.split('—')[1].trim()}</h2>
+      <p>${L.desc}</p>
+      <canvas class="mini" width="400" height="300"></canvas>
+      <div class="meta">
+        <span>${L.timeLimit}s limit · ${L.lineWidth}px line</span>
+        <span class="best">${best ? 'Best ' + best.score : 'No record'}</span>
+      </div>
+    `;
+    card.onclick = () => openConfig(L.id);
+    grid.appendChild(card);
+    drawMiniTrack(card.querySelector('canvas'), L);
+  });
+}
+function drawMiniTrack(canvas, L) {
+  const c = canvas.getContext('2d');
+  const sx = canvas.width / CANVAS_W, sy = canvas.height / CANVAS_H;
+  c.fillStyle = '#fff'; c.fillRect(0,0,canvas.width, canvas.height);
+  const pts = L.path();
+  c.strokeStyle = '#000'; c.lineWidth = Math.max(2, L.lineWidth * sx * 0.7);
+  c.lineCap='round'; c.lineJoin='round';
+  c.beginPath();
+  pts.forEach((p,i)=> i? c.lineTo(p.x*sx, p.y*sy) : c.moveTo(p.x*sx, p.y*sy));
+  c.stroke();
+  // start = green dot, finish = red dot
+  const start = pts[0], end = pts[pts.length-1];
+  c.fillStyle = '#1ea96b'; c.beginPath(); c.arc(start.x*sx, start.y*sy, 6, 0, Math.PI*2); c.fill();
+  c.fillStyle = '#e0556b'; c.beginPath(); c.arc(end.x*sx, end.y*sy, 6, 0, Math.PI*2); c.fill();
+}
+document.getElementById('resetLeaderboard').onclick = () => {
+  if (confirm('Reset all best scores?')) { localStorage.removeItem(LB_KEY); renderLevelSelect(); }
+};
+
+// =========================================================================
+// CONFIG / PREVIEW SCREEN
+// =========================================================================
+let activeLevel = null;
+const tipsBox = document.getElementById('tipsBox');
+const previewCanvas = document.getElementById('previewCanvas');
+const previewCtx = previewCanvas.getContext('2d');
+
+function openConfig(levelId) {
+  activeLevel = LEVELS.find(L=>L.id===levelId);
+  document.getElementById('cfgTitle').textContent = activeLevel.name;
+  // First time on this level? Start the beginner from good, level-appropriate values.
+  // (Retrying later keeps whatever the player tuned.)
+  if (!seenLevels.has(levelId)) { seenLevels.add(levelId); applyRecommended(); }
+  // tips
+  tipsBox.innerHTML = `<h3>Tips for this track</h3><ul>${activeLevel.tips.map(t=>`<li>${t}</li>`).join('')}</ul>`;
+  // preview
+  drawTrackOnCanvas(previewCtx, activeLevel, true);
+  showScreen('config-screen');
+}
+document.getElementById('backToSelect').onclick = () => { showScreen('select-screen'); renderLevelSelect(); };
+
+function drawTrackOnCanvas(c, L, withStartFinish) {
+  c.fillStyle = '#fff'; c.fillRect(0,0,CANVAS_W,CANVAS_H);
+  const pts = L.path();
+  c.strokeStyle = '#000'; c.lineWidth = L.lineWidth;
+  c.lineCap='round'; c.lineJoin='round';
+  c.beginPath();
+  pts.forEach((p,i)=> i? c.lineTo(p.x,p.y) : c.moveTo(p.x,p.y));
+  c.stroke();
+  if (withStartFinish) {
+    const start = pts[0], end = pts[pts.length-1];
+    c.fillStyle = '#1ea96b';
+    c.beginPath(); c.arc(start.x, start.y, 9, 0, Math.PI*2); c.fill();
+    c.fillStyle = '#fff'; c.font = 'bold 11px sans-serif'; c.textAlign='center';
+    c.fillText('S', start.x, start.y+4);
+    c.fillStyle = '#e0556b';
+    c.beginPath(); c.arc(end.x, end.y, 9, 0, Math.PI*2); c.fill();
+    c.fillStyle='#fff'; c.fillText('F', end.x, end.y+4);
+  }
+}
+
+// live value labels for config sliders
+function bindLabel(id, el, fmt) {
+  const lbl = document.getElementById(el);
+  const input = document.getElementById(id);
+  const f = () => lbl.textContent = fmt ? fmt(input.value) : input.value;
+  input.addEventListener('input', f); f();
+}
+bindLabel('cs_sensors', 'vs_sensors');
+bindLabel('cs_sensitivity', 'vs_sensitivity', v=>v+'%');
+bindLabel('cs_speed', 'vs_speed');
+bindLabel('cs_kp', 'vs_kp', v=>(v/100).toFixed(2));
+bindLabel('cs_friction', 'vs_friction', v=>(v/100).toFixed(2));
+bindLabel('cs_tau', 'vs_tau');
+bindLabel('cs_accel', 'vs_accel');
+bindLabel('cs_noise', 'vs_noise');
+bindLabel('cs_hz', 'vs_hz');
+
+document.getElementById('startLevelBtn').onclick = () => startLevel();
+
+// ----- Beginner-friendly recommended settings (per level) -----
+// Values are the raw slider/input values the engine reads.
+const RECOMMEND = {
+  1: { speed: 140, kp: 80,  sensors: 3, sensitivity: 60 },
+  2: { speed: 150, kp: 170, sensors: 5, sensitivity: 60 },
+  3: { speed: 120, kp: 200, sensors: 7, sensitivity: 65 }
+};
+const seenLevels = new Set();   // levels we've auto-applied good defaults to
+function applyRecommended() {
+  const r = activeLevel && RECOMMEND[activeLevel.id];
+  if (!r) return;
+  [['cs_speed', r.speed], ['cs_kp', r.kp], ['cs_sensors', r.sensors], ['cs_sensitivity', r.sensitivity]]
+    .forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      el.value = val;
+      el.dispatchEvent(new Event('input'));   // refresh the live value labels
+    });
+}
+const recBtn = document.getElementById('recommendBtn');
+recBtn.onclick = () => {
+  applyRecommended();
+  recBtn.classList.remove('flash'); void recBtn.offsetWidth; recBtn.classList.add('flash');
+};
+
+// =========================================================================
+// PLAY SCREEN — simulation
+// =========================================================================
+const gameCanvas = document.getElementById('gameCanvas');
+const gctx = gameCanvas.getContext('2d');
+// offscreen field for sampling
+const field = document.createElement('canvas');
+field.width = CANVAS_W; field.height = CANVAS_H;
+const fctx = field.getContext('2d', { willReadFrequently:true });
+
+const robot = {
+  x:0, y:0, theta:0,
+  vL:0, vR:0,             // actual wheel surface velocities (mm/s)
+  cmdL:0, cmdR:0,         // commanded PWM (latched by control loop)
+  v:0, omega:0,           // computed body velocities
+  accelLin:0, accelLat:0, // last-step accelerations (mm/s²)
+  slipping:false, slipAmt:0,
+  ctrlAccum:0,            // accumulator for fixed-rate control loop
+  ambientPhase:0,         // accumulator for ambient-light flicker
+  lastSeenError:0, running:false, trail:[]
+};
+let cfg = {};
+let game = null;     // current game state object
+
+function gatherConfig() {
+  return {
+    sensors: clampInt('cs_sensors', 2, 16),
+    wheelDia: +document.getElementById('cs_wheelDia').value,
+    wheelW: +document.getElementById('cs_wheelW').value,
+    chassisL: +document.getElementById('cs_chassisL').value,
+    chassisW: +document.getElementById('cs_chassisW').value,
+    axle: +document.getElementById('cs_axle').value,
+    rpm: +document.getElementById('cs_rpm').value,
+    motorDia: +document.getElementById('cs_motorDia').value,
+    sensitivity: +document.getElementById('cs_sensitivity').value,
+    speed: +document.getElementById('cs_speed').value,
+    kp: (+document.getElementById('cs_kp').value)/100,
+    // physics
+    mass:        +document.getElementById('cs_mass').value,                // g
+    friction:   (+document.getElementById('cs_friction').value)/100,       // μ
+    motorTau:    +document.getElementById('cs_tau').value,                  // ms
+    maxAccel:    +document.getElementById('cs_accel').value,                // mm/s²
+    sensorNoise: +document.getElementById('cs_noise').value,                // counts σ
+    controlHz:   +document.getElementById('cs_hz').value,                   // Hz
+    ambient:      document.getElementById('cs_ambient').checked             // bool
+  };
+}
+function clampInt(id, lo, hi) {
+  const el = document.getElementById(id);
+  let v = parseInt(el.value, 10);
+  if (isNaN(v)) v = lo;
+  v = Math.max(lo, Math.min(hi, v));
+  el.value = v;
+  return v;
+}
+
+function startLevel() {
+  cfg = gatherConfig();
+  // build sensor bars
+  const wrap = document.getElementById('sensorBars');
+  wrap.innerHTML = '';
+  for (let i=0;i<cfg.sensors;i++){ const b=document.createElement('div'); b.className='sbar'; wrap.appendChild(b); }
+  // paint field with the track
+  drawTrackOnCanvas(fctx, activeLevel, false);
+
+  robot.x = activeLevel.start.x;
+  robot.y = activeLevel.start.y;
+  robot.theta = activeLevel.start.theta;
+  robot.vL = robot.vR = 0;
+  robot.cmdL = robot.cmdR = 0;
+  robot.v = robot.omega = 0;
+  robot.accelLin = robot.accelLat = 0;
+  robot.slipping = false; robot.slipAmt = 0;
+  robot.ctrlAccum = 0; robot.ambientPhase = 0;
+  robot.trail = []; robot.lastSeenError = 0; robot.running = true;
+
+  game = {
+    levelId: activeLevel.id,
+    pathPts: activeLevel.path(),
+    timeLimit: activeLevel.timeLimit,
+    timeLeft: activeLevel.timeLimit,
+    progress: 0,             // 0..1, monotonic
+    lastIdx: 0,              // index in pathPts we're nearest to (monotonic)
+    losses: 0,
+    losing: false, lossT: 0, // debounce for line-loss
+    started: performance.now(),
+    finished: false,
+    won: false
+  };
+
+  document.getElementById('hudLevel').textContent = activeLevel.name;
+  document.getElementById('liveHint').innerHTML = activeLevel.tips.map(t=>'• '+t).join('<br>');
+  showScreen('play-screen');
+  lastT = 0;
+  requestAnimationFrame(gameLoop);
+}
+
+document.getElementById('abandonBtn').onclick = () => {
+  robot.running = false; showScreen('select-screen'); renderLevelSelect();
+};
+document.getElementById('restartBtn').onclick = () => { robot.running=false; startLevel(); };
+
+// Simple / Detailed sidebar toggle — beginners see just the tips by default.
+document.querySelectorAll('#viewToggle button').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#viewToggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('techBoxes').style.display =
+      btn.dataset.view === 'detailed' ? 'flex' : 'none';
+  };
+});
+
+// ----- Sensor geometry -----
+function sensorOffsets() {
+  const n = cfg.sensors;
+  const span = cfg.chassisW * 0.8;
+  const fwd = cfg.chassisL * 0.42;
+  const out = [];
+  for (let i=0;i<n;i++){
+    const t = n===1 ? 0.5 : i/(n-1);
+    out.push({ lat:(t-0.5)*span, fwd });
+  }
+  return out;
+}
+function localToWorld(lat, fwd) {
+  const c=Math.cos(robot.theta), s=Math.sin(robot.theta);
+  const fx=fwd*PX_PER_MM, lx=lat*PX_PER_MM;
+  return { x: robot.x + fx*c + lx*(-s), y: robot.y + fx*s + lx*c };
+}
+
+// ----- Sensing -----
+let sensorData = [];
+// Box–Muller Gaussian noise generator (mean 0, σ 1)
+function gauss() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function readSensors() {
+  const offs = sensorOffsets();
+  const thresh = 60 + (cfg.sensitivity/100)*150;
+  // Ambient-light flicker: low-frequency drift in baseline brightness
+  const ambientOffset = cfg.ambient
+    ? 14 * Math.sin(robot.ambientPhase * 1.7) + 8 * Math.sin(robot.ambientPhase * 4.1 + 1.3)
+    : 0;
+  sensorData = offs.map(o => {
+    const p = localToWorld(o.lat, o.fwd);
+    let bright = 255;
+    if (p.x>=0 && p.x<CANVAS_W && p.y>=0 && p.y<CANVAS_H){
+      const d = fctx.getImageData(p.x|0, p.y|0, 1, 1).data;
+      bright = (d[0]+d[1]+d[2])/3;
+    }
+    // Add gaussian noise + ambient
+    bright += gauss() * cfg.sensorNoise + ambientOffset;
+    bright = Math.max(0, Math.min(255, bright));
+    const value = Math.max(0, Math.min(255, Math.round(255 - bright)));
+    const on = bright < thresh;
+    return { x:p.x, y:p.y, value, on };
+  });
+  return sensorData;
+}
+
+// ----- Controller -----
+let lastCtrl = { left:0, right:0, error:0, onLine:false };
+function computeControl() {
+  const n = sensorData.length;
+  let wsum=0, vsum=0, any=false;
+  sensorData.forEach((s,i)=>{
+    const pos = n===1 ? 0 : (i/(n-1)-0.5)*2;
+    const w = s.on ? 255 : 0; // digital mode for challenges
+    if (w>0) any=true;
+    wsum += w*pos; vsum += w;
+  });
+  let error;
+  if (any) { error = wsum/vsum; robot.lastSeenError = error; }
+  else      { error = robot.lastSeenError >= 0 ? 1.2 : -1.2; }
+
+  const base = cfg.speed;
+  const corr = cfg.kp * error * base;
+  // error > 0 means line is to the robot's right -> turn right
+  // turning right = slow the right wheel, speed up the left wheel
+  let left  = Math.max(-255, Math.min(255, base-corr));
+  let right = Math.max(-255, Math.min(255, base+corr));
+  return { left, right, error, onLine:any };
+}
+
+// ----- Physics constants -----
+const G_MM_S2 = 9810;       // gravity (mm/s²)
+const PWM_DEADBAND = 18;    // below this PWM the motor won't overcome static friction
+const ROLL_FRIC_COEF = 0.03; // rolling-resistance coefficient
+
+// ----- Physics step -----
+let lastT = 0;
+function step(dt) {
+  // ===============================================================
+  // 1. CONTROL LOOP — runs at fixed cfg.controlHz, not every frame
+  //    Sensors are sampled and PWM commands are latched only here.
+  // ===============================================================
+  const ctrlPeriod = 1 / Math.max(1, cfg.controlHz);
+  robot.ctrlAccum += dt;
+  while (robot.ctrlAccum >= ctrlPeriod) {
+    robot.ctrlAccum -= ctrlPeriod;
+    readSensors();
+    const ctrl = computeControl();
+    robot.cmdL = ctrl.left;
+    robot.cmdR = ctrl.right;
+    lastCtrl = ctrl;
+  }
+  robot.ambientPhase += dt;
+
+  // ===============================================================
+  // 2. MOTOR DYNAMICS — PWM → target wheel speed (with deadband and
+  //    a mild non-linearity at low PWM), then first-order lag toward
+  //    that target, hard-capped by max wheel acceleration (torque).
+  // ===============================================================
+  const MAX_MM_S = (cfg.rpm / 60) * Math.PI * cfg.wheelDia;
+  function pwmToTargetSpeed(pwm) {
+    const a = Math.abs(pwm);
+    if (a < PWM_DEADBAND) return 0;
+    // Non-linear scaling — motors barely move just above deadband
+    const eff = (a - PWM_DEADBAND) / (255 - PWM_DEADBAND);
+    return Math.sign(pwm) * MAX_MM_S * Math.pow(eff, 0.85);
+  }
+  const targetVL = pwmToTargetSpeed(robot.cmdL);
+  const targetVR = pwmToTargetSpeed(robot.cmdR);
+
+  const tauSec = Math.max(0.001, cfg.motorTau / 1000);
+  const kLag   = 1 - Math.exp(-dt / tauSec);
+
+  // Tentative wheel-speed deltas from the motor response
+  let dvL = (targetVL - robot.vL) * kLag;
+  let dvR = (targetVR - robot.vR) * kLag;
+
+  // Cap by max wheel acceleration (torque limit)
+  const maxDV = cfg.maxAccel * dt;
+  dvL = Math.max(-maxDV, Math.min(maxDV, dvL));
+  dvR = Math.max(-maxDV, Math.min(maxDV, dvR));
+
+  // Rolling friction — opposes motion when motor isn't actively driving
+  const rollDecel = ROLL_FRIC_COEF * G_MM_S2 * dt;
+  if (Math.abs(robot.cmdL) < PWM_DEADBAND && Math.abs(robot.vL) > 0) {
+    const r = Math.sign(robot.vL) * Math.min(Math.abs(robot.vL), rollDecel);
+    dvL -= r;
+  }
+  if (Math.abs(robot.cmdR) < PWM_DEADBAND && Math.abs(robot.vR) > 0) {
+    const r = Math.sign(robot.vR) * Math.min(Math.abs(robot.vR), rollDecel);
+    dvR -= r;
+  }
+
+  // ===============================================================
+  // 3. TRACTION / SLIP — total acceleration (longitudinal + lateral
+  //    centripetal) cannot exceed μ·g. If it does, scale back the
+  //    velocity changes proportionally and flag the wheels as slipping.
+  // ===============================================================
+  const aLinReq = (dvL + dvR) / (2 * dt);
+  const vBody   = (robot.vL + robot.vR) / 2;
+  const wBody   = (robot.vR - robot.vL) / cfg.axle;
+  const aLat    = vBody * wBody;                  // centripetal accel (mm/s²)
+  const aTotal  = Math.hypot(aLinReq, aLat);
+  const aMax    = cfg.friction * G_MM_S2;
+
+  let slip = 0;
+  if (aTotal > aMax) {
+    slip = (aTotal - aMax) / aTotal;
+    // Reduce commanded velocity change (understeer + reduced traction)
+    dvL *= (1 - slip * 0.85);
+    dvR *= (1 - slip * 0.85);
+  }
+  robot.slipping = slip > 0.05;
+  robot.slipAmt  = slip;
+
+  robot.vL += dvL;
+  robot.vR += dvR;
+
+  // ===============================================================
+  // 4. KINEMATIC INTEGRATION — differential-drive forward update.
+  // ===============================================================
+  const v     = (robot.vL + robot.vR) / 2;
+  const omega = (robot.vR - robot.vL) / cfg.axle;
+  robot.v        = v;
+  robot.omega    = omega;
+  robot.accelLin = dvL / dt + dvR / dt;            // sum of wheel decel (info only)
+  robot.accelLat = aLat;
+
+  robot.theta += omega * dt;
+  robot.x += v * Math.cos(robot.theta) * dt * PX_PER_MM;
+  robot.y += v * Math.sin(robot.theta) * dt * PX_PER_MM;
+  robot.x = Math.max(0, Math.min(CANVAS_W, robot.x));
+  robot.y = Math.max(0, Math.min(CANVAS_H, robot.y));
+  robot.trail.push({x:robot.x,y:robot.y});
+  if (robot.trail.length>3000) robot.trail.shift();
+
+  // update progress: find nearest path point within a sliding window ahead of lastIdx
+  const search = 80;
+  const pts = game.pathPts;
+  let bestI = game.lastIdx, bestD = Infinity;
+  const start = game.lastIdx;
+  const end   = Math.min(pts.length-1, game.lastIdx + search);
+  for (let i=start; i<=end; i++){
+    const dx = pts[i].x - robot.x, dy = pts[i].y - robot.y;
+    const d = dx*dx+dy*dy;
+    if (d<bestD){ bestD=d; bestI=i; }
+  }
+  if (bestI > game.lastIdx) game.lastIdx = bestI;
+  game.progress = game.lastIdx / (pts.length-1);
+
+  // line loss tracking (debounced) — read from latest control-loop result
+  if (!lastCtrl.onLine) {
+    game.lossT += dt;
+    if (!game.losing && game.lossT > 0.35) { game.losing = true; game.losses++; }
+  } else {
+    game.lossT = 0;
+    game.losing = false;
+  }
+}
+
+// ----- Rendering -----
+function drawRobot(c) {
+  c.save();
+  c.translate(robot.x, robot.y);
+  c.rotate(robot.theta);
+  const L = cfg.chassisL*PX_PER_MM, W = cfg.chassisW*PX_PER_MM;
+  const wD = cfg.wheelDia*PX_PER_MM, wW = cfg.wheelW*PX_PER_MM;
+  const axle = cfg.axle*PX_PER_MM;
+  // Slip glow — robot outline turns red when traction is exceeded
+  if (robot.slipping) {
+    c.fillStyle='rgba(224,85,107,0.28)';
+    c.strokeStyle='#e0556b'; c.lineWidth=2.5;
+    c.setLineDash([6,4]);
+  } else {
+    c.fillStyle='rgba(70,209,163,0.22)';
+    c.strokeStyle='#1f8f6e'; c.lineWidth=2;
+  }
+  c.beginPath(); c.rect(-L/2,-W/2,L,W); c.fill(); c.stroke();
+  c.setLineDash([]);
+  c.fillStyle='#f5a623';
+  c.beginPath(); c.moveTo(L/2,0); c.lineTo(L/2-10,-6); c.lineTo(L/2-10,6); c.closePath(); c.fill();
+  c.fillStyle='#222';
+  [-axle/2, axle/2].forEach(ly => c.fillRect(-wD/2, ly-wW/2, wD, wW));
+  c.restore();
+  // sensors
+  sensorData.forEach(s=>{
+    c.beginPath(); c.arc(s.x,s.y,5,0,Math.PI*2);
+    c.fillStyle = s.on ? '#f5a623' : '#39506b'; c.fill();
+    c.strokeStyle = s.on ? '#fff' : '#7d8ba0'; c.lineWidth=1.5; c.stroke();
+  });
+}
+
+function render() {
+  gctx.clearRect(0,0,CANVAS_W,CANVAS_H);
+  gctx.drawImage(field, 0, 0);
+  // start/finish markers (always visible)
+  const pts = game.pathPts;
+  const s = pts[0], e = pts[pts.length-1];
+  gctx.fillStyle = '#1ea96b';
+  gctx.beginPath(); gctx.arc(s.x, s.y, 10, 0, Math.PI*2); gctx.fill();
+  gctx.fillStyle = '#fff'; gctx.font='bold 11px sans-serif'; gctx.textAlign='center';
+  gctx.fillText('S', s.x, s.y+4);
+  gctx.fillStyle = '#e0556b';
+  gctx.beginPath(); gctx.arc(e.x, e.y, 10, 0, Math.PI*2); gctx.fill();
+  gctx.fillStyle = '#fff'; gctx.fillText('F', e.x, e.y+4);
+  // trail
+  if (robot.trail.length>1) {
+    gctx.strokeStyle='rgba(224,85,107,0.65)'; gctx.lineWidth=2;
+    gctx.beginPath();
+    gctx.moveTo(robot.trail[0].x, robot.trail[0].y);
+    for (let i=1;i<robot.trail.length;i++) gctx.lineTo(robot.trail[i].x, robot.trail[i].y);
+    gctx.stroke();
+  }
+  drawRobot(gctx);
+}
+
+function updateHUD() {
+  document.getElementById('hudTime').textContent = game.timeLeft.toFixed(1);
+  document.getElementById('hudLoss').textContent = game.losses;
+  document.getElementById('hudProg').textContent = Math.round(game.progress*100);
+  const fill = document.getElementById('timeFill');
+  const pct = (game.timeLeft / game.timeLimit) * 100;
+  fill.style.width = pct + '%';
+  fill.classList.toggle('warning', pct < 50 && pct >= 25);
+  fill.classList.toggle('danger',  pct < 25);
+
+  document.getElementById('d_state').textContent = game.finished ? 'Done' : 'Running';
+  document.getElementById('d_err').textContent = lastCtrl.error.toFixed(2);
+  document.getElementById('d_on').textContent = lastCtrl.onLine ? 'yes' : 'lost';
+  document.getElementById('d_on').style.color = lastCtrl.onLine ? 'var(--accent)' : 'var(--danger)';
+  const deg = ((robot.theta*180/Math.PI)%360+360)%360;
+  document.getElementById('d_head').textContent = deg.toFixed(0)+'°';
+
+  const bars = document.getElementById('sensorBars').children;
+  sensorData.forEach((s,i)=>{
+    if (!bars[i]) return;
+    const h = s.on ? 1 : 0.1;
+    bars[i].style.height = (6 + h*30)+'px';
+    bars[i].style.background = s.on ? '#f5a623' : '#39506b';
+  });
+  // Commanded PWM (latched by control loop) and actual wheel speeds
+  document.getElementById('d_ml').textContent =
+    `${Math.round(robot.cmdL)} / ${Math.round(robot.cmdR)}`;
+  document.getElementById('d_mr').textContent =
+    `${Math.round(robot.vL)} / ${Math.round(robot.vR)}`;
+
+  // Physics panel
+  document.getElementById('d_v').textContent    = robot.v.toFixed(0) + ' mm/s';
+  document.getElementById('d_w').textContent    = robot.omega.toFixed(2) + ' rad/s';
+  document.getElementById('d_alat').textContent = robot.accelLat.toFixed(0) + ' mm/s²';
+  document.getElementById('d_amax').textContent = (cfg.friction * 9810).toFixed(0) + ' mm/s²';
+  const slipEl = document.getElementById('d_slip');
+  if (robot.slipping) {
+    slipEl.textContent = 'YES (' + (robot.slipAmt*100).toFixed(0) + '%)';
+    slipEl.style.color = 'var(--danger)';
+  } else {
+    slipEl.textContent = 'no';
+    slipEl.style.color = 'var(--accent)';
+  }
+}
+
+function gameLoop(t) {
+  if (!robot.running) return;
+  if (!lastT) lastT = t;
+  let dt = (t-lastT)/1000; lastT=t;
+  if (dt>0.05) dt=0.05;
+  const sub = 4;
+  for (let i=0;i<sub;i++) step(dt/sub);
+  game.timeLeft = Math.max(0, game.timeLimit - (performance.now()-game.started)/1000);
+
+  if (game.progress >= 0.98 && !game.finished) endLevel(true);
+  else if (game.timeLeft <= 0 && !game.finished) endLevel(false);
+
+  render(); updateHUD();
+  if (robot.running) requestAnimationFrame(gameLoop);
+}
+
+// =========================================================================
+// RESULT SCREEN
+// =========================================================================
+function endLevel(won) {
+  game.finished = true; game.won = won;
+  robot.running = false;
+  const elapsed = (performance.now() - game.started)/1000;
+  const timeUsed = Math.min(elapsed, game.timeLimit);
+
+  // scoring:
+  //  base 1000 if you win, otherwise scaled by progress (0..600)
+  //  + up to 600 points for finishing fast
+  //  - 50 per line loss
+  let score;
+  if (won) {
+    const speedBonus = Math.round(600 * (1 - timeUsed/game.timeLimit));
+    score = 1000 + Math.max(0, speedBonus) - 50*game.losses;
+  } else {
+    score = Math.round(600 * game.progress) - 30*game.losses;
+  }
+  score = Math.max(0, score);
+
+  // stars
+  let stars = 0;
+  if (won) {
+    stars = 1;
+    if (game.losses <= 5 && timeUsed < game.timeLimit*0.85) stars = 2;
+    if (game.losses <= 2 && timeUsed < game.timeLimit*0.65) stars = 3;
+  }
+
+  const newBest = setBest(game.levelId, {
+    score, time: +timeUsed.toFixed(2), losses: game.losses, stars,
+    when: new Date().toISOString()
+  });
+
+  // populate result UI
+  document.getElementById('verdictTxt').textContent = won ? 'Track Cleared!' : 'Run Failed';
+  document.getElementById('verdictTxt').className = 'verdict ' + (won ? 'win' : 'lose');
+  const starsEl = document.getElementById('starsTxt');
+  starsEl.innerHTML = [0,1,2].map(i =>
+    `<span class="${i<stars?'on':''}">★</span>`
+  ).join('');
+  document.getElementById('scoreBig').textContent = score;
+  document.getElementById('rsTime').textContent = timeUsed.toFixed(2) + 's';
+  document.getElementById('rsLoss').textContent = game.losses;
+  document.getElementById('rsProg').textContent = Math.round(game.progress*100) + '%';
+  document.getElementById('newBestTag').style.display = newBest ? 'inline-block' : 'none';
+
+  // Plain-language coaching: what should the player try next?
+  let tip;
+  if (won) {
+    if (stars >= 3) tip = '🏆 Perfect run! Try the next level, or push the Speed higher for a tougher challenge.';
+    else tip = `Cleared with ${stars} star${stars>1?'s':''}. For more stars, finish faster and lose the line less — nudge Speed up a little, or raise Steering strength.`;
+  } else if (game.progress >= 0.7) {
+    tip = '⏱️ So close! You ran out of time near the end. Lower Motor speed a touch for steadier control, then Retry.';
+  } else if (game.losses >= 3) {
+    tip = `The robot fell off the line ${game.losses} times. Try raising Steering strength (Kp), adding a couple of sensors, or slowing down.`;
+  } else {
+    tip = 'The robot drifted off track. Tip: open setup, click "Use recommended settings", then fine-tune Speed and Steering.';
+  }
+  document.getElementById('resultTip').textContent = tip;
+
+  // next-level button visibility
+  const nextBtn = document.getElementById('rNext');
+  const hasNext = won && game.levelId < LEVELS.length;
+  nextBtn.style.display = hasNext ? 'inline-block' : 'none';
+
+  showScreen('result-screen');
+}
+document.getElementById('rBack').onclick = () => { showScreen('select-screen'); renderLevelSelect(); };
+document.getElementById('rRetry').onclick = () => { openConfig(game.levelId); };
+document.getElementById('rNext').onclick = () => {
+  const next = LEVELS.find(L=>L.id === game.levelId+1);
+  if (next) openConfig(next.id);
+};
+
+// =========================================================================
+// Screen helpers
+// =========================================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+// init
+renderLevelSelect();
+</script>
+</body>
+</html>
